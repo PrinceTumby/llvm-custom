@@ -43,7 +43,7 @@ class MipsSubtarget : public MipsGenSubtargetInfo {
     Mips3, Mips4, Mips5, Mips64, Mips64r2, Mips64r3, Mips64r5, Mips64r6
   };
 
-  enum class CPU { Others, P5600, I6400, I6500 };
+  enum class CPU { Others, P5600, I6400, I6500, R5900 };
 
   // Used to avoid printing dsp warnings multiple times.
   static bool DspWarningPrinted;
@@ -201,6 +201,9 @@ class MipsSubtarget : public MipsGenSubtargetInfo {
   // Disable unaligned load store for r6.
   bool StrictAlign;
 
+  // Pad short loops as a workaround for the R5900 short loop erratum.
+  bool ShortLoopBug;
+
   /// The minimum alignment known to hold of the stack frame on
   /// entry to the function and which must be maintained by every function.
   Align stackAlignment;
@@ -345,6 +348,8 @@ public:
   bool enableLongBranchPass() const {
     return hasStandardEncoding() || inMicroMipsMode() || allowMixed16_32();
   }
+
+  bool enableShortLoopBugPass() const { return ShortLoopBug; }
 
   /// Features related to the presence of specific instructions.
   bool hasExtractInsert() const { return !inMips16Mode() && hasMips32r2(); }

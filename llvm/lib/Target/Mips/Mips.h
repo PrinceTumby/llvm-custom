@@ -51,6 +51,7 @@ FunctionPass *createMipsExpandPseudoPass();
 FunctionPass *createMipsPreLegalizeCombiner();
 FunctionPass *createMipsPostLegalizeCombiner(bool IsOptNone);
 FunctionPass *createMipsMulMulBugPass();
+FunctionPass *createMipsShortLoopBugPass();
 
 InstructionSelector *
 createMipsInstructionSelector(const MipsTargetMachine &, const MipsSubtarget &,
@@ -62,6 +63,7 @@ void initializeMipsBranchExpansionPass(PassRegistry &);
 void initializeMipsDAGToDAGISelLegacyPass(PassRegistry &);
 void initializeMipsDelaySlotFillerPass(PassRegistry &);
 void initializeMipsMulMulBugFixPass(PassRegistry &);
+void initializeMipsShortLoopBugFixPass(PassRegistry &);
 void initializeMipsPostLegalizerCombinerPass(PassRegistry &);
 void initializeMipsPreLegalizerCombinerPass(PassRegistry &);
 } // namespace llvm

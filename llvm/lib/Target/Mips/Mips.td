@@ -212,6 +212,10 @@ def FeatureStrictAlign
     : SubtargetFeature<"strict-align", "StrictAlign", "true",
                        "Disable unaligned load store for r6">;
 
+def FeatureShortLoopBug
+    : SubtargetFeature<"short-loop-bug", "ShortLoopBug", "true",
+                       "Enable a workaround for the R5900 short loop erratum">;
+
 //===----------------------------------------------------------------------===//
 // Register File, Calling Conv, Instruction Descriptions
 //===----------------------------------------------------------------------===//
@@ -226,6 +230,7 @@ include "MipsCombine.td"
 // Avoid forward declaration issues.
 include "MipsScheduleI6400.td"
 include "MipsScheduleP5600.td"
+// include "MipsScheduleR5900.td"
 include "MipsScheduleGeneric.td"
 
 def MipsInstrInfo : InstrInfo {
@@ -248,6 +253,11 @@ def ImplI6400
 def ImplI6500
     : SubtargetFeature<"i6500", "ProcImpl", "MipsSubtarget::CPU::I6500",
                        "MIPS I6500 Processor", [FeatureMips64r6, FeatureMSA]>;
+
+def ImplR5900
+    : SubtargetFeature<"r5900", "ProcImpl", "MipsSubtarget::CPU::R5900",
+                       "MIPS R5900 Processor",
+                       [FeatureMips2, FeatureShortLoopBug]>;
 
 class Proc<string Name, list<SubtargetFeature> Features>
  : ProcessorModel<Name, MipsGenericModel, Features>;
@@ -274,6 +284,8 @@ def : Proc<"octeon+", [FeatureMips64r2, FeatureCnMips, FeatureCnMipsP]>;
 def : ProcessorModel<"p5600", MipsP5600Model, [ImplP5600]>;
 def : ProcessorModel<"i6400", MipsI6400Model, [ImplI6400]>;
 def : ProcessorModel<"i6500", MipsI6400Model, [ImplI6500]>;
+// TODO: Finish writing MipsR5900Model
+def : ProcessorModel<"r5900", MipsGenericModel, [ImplR5900]>;
 
 def MipsAsmParser : AsmParser {
   let ShouldEmitMatchRegisterName = 0;

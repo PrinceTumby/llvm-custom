@@ -68,6 +68,7 @@ extern "C" LLVM_ABI LLVM_EXTERNAL_VISIBILITY void LLVMInitializeMipsTarget() {
   initializeMipsPreLegalizerCombinerPass(*PR);
   initializeMipsPostLegalizerCombinerPass(*PR);
   initializeMipsMulMulBugFixPass(*PR);
+  initializeMipsShortLoopBugFixPass(*PR);
   initializeMipsDAGToDAGISelLegacyPass(*PR);
 }
 
@@ -323,6 +324,11 @@ void MipsPassConfig::addPreEmitPass() {
   // instructions when the "mfix4300" flag is passed.
   if (EnableMulMulFix)
     addPass(createMipsMulMulBugPass());
+
+  // This pass inserts nop instructions for loops shorter than or equal to six
+  // instructions when the "ShortLoopBug" feature is enabled.
+  if (getMipsSubtarget().enableShortLoopBugPass())
+    addPass(createMipsShortLoopBugPass());
 
   // The delay slot filler pass can potientially create forbidden slot hazards
   // for MIPSR6 and therefore it should go before MipsBranchExpansion pass.
