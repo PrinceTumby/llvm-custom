@@ -6,6 +6,7 @@ add_llvm_component_library(LLVMPowerPCDesc
   PPCMCCodeEmitter.cpp
   PPCPredicates.cpp
   PPCELFObjectWriter.cpp
+  PPCMachObjectWriter.cpp
   PPCXCOFFObjectWriter.cpp
   PPCELFStreamer.cpp
   PPCXCOFFStreamer.cpp

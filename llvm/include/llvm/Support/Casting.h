@@ -16,6 +16,10 @@
 
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/type_traits.h"
+#include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/Signals.h"
+#include <cstdio>
+#include <cstdlib>
 #include <cassert>
 #include <memory>
 #include <optional>

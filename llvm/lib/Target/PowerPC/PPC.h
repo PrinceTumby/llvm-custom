@@ -80,6 +80,7 @@ class ModulePass;
   void initializePPCDAGToDAGISelLegacyPass(PassRegistry &);
   void initializePPCLinuxAsmPrinterPass(PassRegistry &);
   void initializePPCAIXAsmPrinterPass(PassRegistry &);
+  void initializePPCDarwinAsmPrinterPass(PassRegistry &);
 
   extern char &PPCVSXFMAMutateID;
 

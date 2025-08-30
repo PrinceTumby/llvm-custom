@@ -147,6 +147,7 @@ LLVMInitializePowerPCTarget() {
   initializePPCDAGToDAGISelLegacyPass(PR);
   initializePPCLinuxAsmPrinterPass(PR);
   initializePPCAIXAsmPrinterPass(PR);
+  initializePPCDarwinAsmPrinterPass(PR);
 }
 
 static bool isLittleEndianTriple(const Triple &T) {
@@ -240,8 +241,10 @@ static std::string computeFSAdditions(StringRef FS, CodeGenOptLevel OL,
 static std::unique_ptr<TargetLoweringObjectFile> createTLOF(const Triple &TT) {
   if (TT.isOSAIX())
     return std::make_unique<TargetLoweringObjectFileXCOFF>();
-
-  return std::make_unique<PPC64LinuxTargetObjectFile>();
+  else if (TT.isMacOSX())
+    return std::make_unique<TargetLoweringObjectFileMachO>();
+  else
+    return std::make_unique<PPC64LinuxTargetObjectFile>();
 }
 
 static PPCTargetMachine::PPCABI computeTargetABI(const Triple &TT,
@@ -298,6 +301,8 @@ getEffectivePPCCodeModel(const Triple &TT, std::optional<CodeModel::Model> CM,
   if (JIT)
     return CodeModel::Small;
   if (TT.isOSAIX())
+    return CodeModel::Small;
+  if (TT.isOSDarwin())
     return CodeModel::Small;
 
   assert(TT.isOSBinFormatELF() && "All remaining PPC OSes are ELF based.");

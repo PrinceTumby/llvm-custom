@@ -55,6 +55,7 @@
 #include "llvm/MC/MCInstBuilder.h"
 #include "llvm/MC/MCSectionELF.h"
 #include "llvm/MC/MCSectionXCOFF.h"
+#include "llvm/MC/MCSectionMachO.h"
 #include "llvm/MC/MCStreamer.h"
 #include "llvm/MC/MCSymbol.h"
 #include "llvm/MC/MCSymbolELF.h"
@@ -305,6 +306,24 @@ public:
   void emitTTypeReference(const GlobalValue *GV, unsigned Encoding) override;
 
   void emitModuleCommandLines(Module &M) override;
+};
+
+/// PPCDarwinAsmPrinter - PowerPC assembly printer, customized for Darwin/Mac
+/// OS X
+class PPCDarwinAsmPrinter : public PPCAsmPrinter {
+public:
+  static char ID;
+
+  explicit PPCDarwinAsmPrinter(TargetMachine &TM,
+                               std::unique_ptr<MCStreamer> Streamer)
+      : PPCAsmPrinter(TM, std::move(Streamer), ID) {}
+
+  StringRef getPassName() const override {
+    return "Darwin PPC Assembly Printer";
+  }
+
+  bool doFinalization(Module &M) override;
+  void emitStartOfAsmFile(Module &M) override;
 };
 
 } // end anonymous namespace
@@ -3333,10 +3352,12 @@ void PPCAIXAsmPrinter::emitTTypeReference(const GlobalValue *GV,
 static AsmPrinter *
 createPPCAsmPrinterPass(TargetMachine &tm,
                         std::unique_ptr<MCStreamer> &&Streamer) {
-  if (tm.getTargetTriple().isOSAIX())
+  if (tm.getTargetTriple().isMacOSX())
+    return new PPCDarwinAsmPrinter(tm, std::move(Streamer));
+  else if (tm.getTargetTriple().isOSAIX())
     return new PPCAIXAsmPrinter(tm, std::move(Streamer));
-
-  return new PPCLinuxAsmPrinter(tm, std::move(Streamer));
+  else
+    return new PPCLinuxAsmPrinter(tm, std::move(Streamer));
 }
 
 void PPCAIXAsmPrinter::emitModuleCommandLines(Module &M) {
@@ -3363,6 +3384,148 @@ char PPCAIXAsmPrinter::ID = 0;
 
 INITIALIZE_PASS(PPCAIXAsmPrinter, "ppc-aix-asm-printer",
                 "AIX PPC Assembly Printer", false, false)
+
+void PPCDarwinAsmPrinter::emitStartOfAsmFile(Module &M) {
+  static const char *const CPUDirectives[] = {
+    "",
+    "ppc",
+    "ppc440",
+    "ppc601",
+    "ppc602",
+    "ppc603",
+    "ppc7400",
+    "ppc750",
+    "ppc970",
+    "ppcA2",
+    "ppce500mc",
+    "ppce5500",
+    "power3",
+    "power4",
+    "power5",
+    "power5x",
+    "power6",
+    "power6x",
+    "power7",
+    // FIXME: why is power8 missing here?
+    "ppc64",
+    "ppc64le",
+    "power9"
+  };
+
+  // Get the numerically largest directive.
+  // FIXME: How should we merge darwin directives?
+  unsigned Directive = PPC::DIR_NONE;
+  for (const Function &F : M) {
+    const PPCSubtarget &STI = TM.getSubtarget<PPCSubtarget>(F);
+    unsigned FDir = STI.getCPUDirective();
+    Directive = Directive > FDir ? FDir : STI.getCPUDirective();
+    if (STI.hasMFOCRF() && Directive < PPC::DIR_970)
+      Directive = PPC::DIR_970;
+    if (STI.hasAltivec() && Directive < PPC::DIR_7400)
+      Directive = PPC::DIR_7400;
+    if (STI.isPPC64() && Directive < PPC::DIR_64)
+      Directive = PPC::DIR_64;
+  }
+
+  assert(Directive <= PPC::DIR_64 && "Directive out of range.");
+
+  assert(Directive < (sizeof CPUDirectives / sizeof CPUDirectives[0]) &&
+         "CPUDirectives[] might not be up-to-date!");
+  PPCTargetStreamer &TStreamer =
+      *static_cast<PPCTargetStreamer *>(OutStreamer->getTargetStreamer());
+  TStreamer.emitMachine(CPUDirectives[Directive]);
+
+  // Prime text sections so they are adjacent.  This reduces the likelihood a
+  // large data or debug section causes a branch to exceed 16M limit.
+  const TargetLoweringObjectFileMachO &TLOFMacho =
+      static_cast<const TargetLoweringObjectFileMachO &>(getObjFileLowering());
+  OutStreamer->switchSection(TLOFMacho.getTextCoalSection());
+  if (TM.getRelocationModel() == Reloc::PIC_) {
+    OutStreamer->switchSection(
+           OutContext.getMachOSection("__TEXT", "__picsymbolstub1",
+                                      MachO::S_SYMBOL_STUBS |
+                                      MachO::S_ATTR_PURE_INSTRUCTIONS,
+                                      32, SectionKind::getText()));
+  } else if (TM.getRelocationModel() == Reloc::DynamicNoPIC) {
+    OutStreamer->switchSection(
+           OutContext.getMachOSection("__TEXT","__symbol_stub1",
+                                      MachO::S_SYMBOL_STUBS |
+                                      MachO::S_ATTR_PURE_INSTRUCTIONS,
+                                      16, SectionKind::getText()));
+  }
+  OutStreamer->switchSection(getObjFileLowering().getTextSection());
+}
+
+bool PPCDarwinAsmPrinter::doFinalization(Module &M) {
+  bool isPPC64 = getDataLayout().getPointerSizeInBits() == 64;
+
+  // Darwin/PPC always uses mach-o.
+  const TargetLoweringObjectFileMachO &TLOFMacho =
+      static_cast<const TargetLoweringObjectFileMachO &>(getObjFileLowering());
+  if (MMI) {
+    MachineModuleInfoMachO &MMIMacho =
+        MMI->getObjFileInfo<MachineModuleInfoMachO>();
+
+    // if (MAI->doesSupportExceptionHandling()) {
+    //   // Add the (possibly multiple) personalities to the set of global values.
+    //   // Only referenced functions get into the Personalities list.
+    //   for (const Function *Personality : MMI->getPersonalities()) {
+    //     if (Personality) {
+    //       MCSymbol *NLPSym =
+    //           getSymbolWithGlobalValueBase(Personality, "$non_lazy_ptr");
+    //       MachineModuleInfoImpl::StubValueTy &StubSym =
+    //           MMIMacho.getGVStubEntry(NLPSym);
+    //       StubSym =
+    //           MachineModuleInfoImpl::StubValueTy(getSymbol(Personality), true);
+    //     }
+    //   }
+    // }
+
+    // Output stubs for dynamically-linked functions.
+    MachineModuleInfoMachO::SymbolListTy Stubs = MMIMacho.GetGVStubList();
+
+    // Output macho stubs for external and common global variables.
+    if (!Stubs.empty()) {
+      // Switch with ".non_lazy_symbol_pointer" directive.
+      OutStreamer->switchSection(TLOFMacho.getNonLazySymbolPointerSection());
+      emitAlignment(llvm::Align(isPPC64 ? 8 : 4));
+
+      for (unsigned i = 0, e = Stubs.size(); i != e; ++i) {
+        // L_foo$stub:
+        OutStreamer->emitLabel(Stubs[i].first);
+        //   .indirect_symbol _foo
+        MachineModuleInfoImpl::StubValueTy &MCSym = Stubs[i].second;
+        OutStreamer->emitSymbolAttribute(MCSym.getPointer(),
+                                         MCSA_IndirectSymbol);
+
+        if (MCSym.getInt())
+          // External to current translation unit.
+          OutStreamer->emitIntValue(0, isPPC64 ? 8 : 4 /*size*/);
+        else
+          // Internal to current translation unit.
+          //
+          // When we place the LSDA into the TEXT section, the type info
+          // pointers
+          // need to be indirect and pc-rel. We accomplish this by using NLPs.
+          // However, sometimes the types are local to the file. So we need to
+          // fill in the value for the NLP in those cases.
+          OutStreamer->emitValue(
+              MCSymbolRefExpr::create(MCSym.getPointer(), OutContext),
+              isPPC64 ? 8 : 4 /*size*/);
+      }
+
+      Stubs.clear();
+      OutStreamer->addBlankLine();
+    }
+  }
+
+  return AsmPrinter::doFinalization(M);
+}
+
+char PPCDarwinAsmPrinter::ID = 0;
+
+INITIALIZE_PASS(PPCDarwinAsmPrinter, "ppc-darwin-asm-printer",
+                "Darwin PPC Assembly Printer", false, false)
 
 // Force static initialization.
 extern "C" LLVM_ABI LLVM_EXTERNAL_VISIBILITY void

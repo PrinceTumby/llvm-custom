@@ -187,10 +187,14 @@ static MCAsmInfo *createPPCMCAsmInfo(const MCRegisterInfo &MRI,
                   TheTriple.getArch() == Triple::ppc64le);
 
   MCAsmInfo *MAI;
-  if (TheTriple.isOSBinFormatXCOFF())
-    MAI = new PPCXCOFFMCAsmInfo(isPPC64, TheTriple);
-  else
+  if (TheTriple.isOSBinFormatELF())
     MAI = new PPCELFMCAsmInfo(isPPC64, TheTriple);
+  else if (TheTriple.isOSBinFormatXCOFF())
+    MAI = new PPCXCOFFMCAsmInfo(isPPC64, TheTriple);
+  else if (TheTriple.isOSBinFormatMachO())
+    MAI = new PPCMCAsmInfoDarwin(isPPC64, TheTriple);
+  else
+    reportFatalUsageError("unsupported object format");
 
   // Initial state of the frame pointer is R1.
   unsigned Reg = isPPC64 ? PPC::X1 : PPC::R1;
@@ -434,9 +438,12 @@ createObjectTargetStreamer(MCStreamer &S, const MCSubtargetInfo &STI) {
   const Triple &TT = STI.getTargetTriple();
   if (TT.isOSBinFormatELF())
     return new PPCTargetELFStreamer(S);
-  if (TT.isOSBinFormatXCOFF())
+  else if (TT.isOSBinFormatXCOFF())
     return new PPCTargetXCOFFStreamer(S);
-  return new PPCTargetMachOStreamer(S);
+  else if (TT.isOSBinFormatMachO())
+    return new PPCTargetMachOStreamer(S);
+  else
+    reportFatalUsageError("unsupported object format");
 }
 
 static MCInstPrinter *createPPCMCInstPrinter(const Triple &T,
@@ -472,6 +479,16 @@ static MCInstrAnalysis *createPPCMCInstrAnalysis(const MCInstrInfo *Info) {
   return new PPCMCInstrAnalysis(Info);
 }
 
+
+static MCStreamer *
+createPPCMachOStreamer(MCContext &Ctx,
+                       std::unique_ptr<MCAsmBackend> &&MAB,
+                       std::unique_ptr<MCObjectWriter> &&OW,
+                       std::unique_ptr<MCCodeEmitter> &&Emitter) {
+  return createMachOStreamer(Ctx, std::move(MAB), std::move(OW),
+                             std::move(Emitter), false);
+}
+
 extern "C" LLVM_ABI LLVM_EXTERNAL_VISIBILITY void
 LLVMInitializePowerPCTargetMC() {
   for (Target *T : {&getThePPC32Target(), &getThePPC32LETarget(),
@@ -497,11 +514,14 @@ LLVMInitializePowerPCTargetMC() {
     // Register the asm backend.
     TargetRegistry::RegisterMCAsmBackend(*T, createPPCAsmBackend);
 
-    // Register the elf streamer.
+    // Register the ELF streamer.
     TargetRegistry::RegisterELFStreamer(*T, createPPCELFStreamer);
 
     // Register the XCOFF streamer.
     TargetRegistry::RegisterXCOFFStreamer(*T, createPPCXCOFFStreamer);
+
+    // Register the Mach-O streamer.
+    TargetRegistry::RegisterMachOStreamer(*T, createPPCMachOStreamer);
 
     // Register the object target streamer.
     TargetRegistry::RegisterObjectTargetStreamer(*T,

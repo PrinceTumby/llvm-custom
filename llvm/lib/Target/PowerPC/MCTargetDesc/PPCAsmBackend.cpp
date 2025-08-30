@@ -220,6 +220,21 @@ void PPCAsmBackend::applyFixup(const MCFragment &F, const MCFixup &Fixup,
 // FIXME: This should be in a separate file.
 namespace {
 
+class DarwinPPCAsmBackend : public PPCAsmBackend {
+public:
+  DarwinPPCAsmBackend(const Target &T, const Triple &TT)
+      : PPCAsmBackend(T, TT) {}
+
+  std::unique_ptr<MCObjectTargetWriter>
+  createObjectTargetWriter() const override {
+    bool Is64 = TT.isPPC64();
+    return createPPCMachObjectWriter(
+        /*Is64Bit=*/Is64,
+        (Is64 ? MachO::CPU_TYPE_POWERPC64 : MachO::CPU_TYPE_POWERPC),
+        MachO::CPU_SUBTYPE_POWERPC_ALL);
+  }
+};
+
 class ELFPPCAsmBackend : public PPCAsmBackend {
 public:
   ELFPPCAsmBackend(const Target &T, const Triple &TT) : PPCAsmBackend(T, TT) {}
@@ -291,8 +306,10 @@ MCAsmBackend *llvm::createPPCAsmBackend(const Target &T,
                                         const MCRegisterInfo &MRI,
                                         const MCTargetOptions &Options) {
   const Triple &TT = STI.getTargetTriple();
-  if (TT.isOSBinFormatXCOFF())
+  if (TT.isOSBinFormatELF())
+    return new ELFPPCAsmBackend(T, TT);
+  else if (TT.isOSBinFormatXCOFF())
     return new XCOFFPPCAsmBackend(T, TT);
-
-  return new ELFPPCAsmBackend(T, TT);
+  else
+    return new DarwinPPCAsmBackend(T, TT);
 }

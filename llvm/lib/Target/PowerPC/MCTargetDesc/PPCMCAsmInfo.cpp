@@ -17,6 +17,8 @@
 
 using namespace llvm;
 
+// ELF
+
 void PPCELFMCAsmInfo::anchor() { }
 
 const MCAsmInfo::AtSpecifier elfAtSpecifiers[] = {
@@ -107,6 +109,16 @@ const MCAsmInfo::AtSpecifier xcoffAtSpecifiers[] = {
     {PPC::S_L, "l"},
     {PPC::S_U, "u"},
     // clang-format on
+};
+
+const MCAsmInfo::AtSpecifier darwinAtSpecifiers[] = {
+    {PPC::S_HA, "ha"},
+    {PPC::S_HI, "h"},
+    {PPC::S_LO, "l"},
+    {PPC::S_PCREL, "PCREL"},
+    {PPC::S_LOCAL, "local"},
+    {PPC::S_NOTOC, "notoc"},
+    {PPC::S_PCREL_OPT, "<<invalid>>"},
 };
 
 static std::optional<int64_t> evaluateAsInt64(uint16_t specifier,
@@ -220,6 +232,8 @@ bool PPCELFMCAsmInfo::evaluateAsRelocatableImpl(const MCSpecifierExpr &Expr,
   return evaluateAsRelocatable(Expr, Res, Asm);
 }
 
+// XCOFF
+
 void PPCXCOFFMCAsmInfo::anchor() {}
 
 PPCXCOFFMCAsmInfo::PPCXCOFFMCAsmInfo(bool Is64Bit, const Triple &T) {
@@ -253,5 +267,50 @@ void PPCXCOFFMCAsmInfo::printSpecifierExpr(raw_ostream &OS,
 
 bool PPCXCOFFMCAsmInfo::evaluateAsRelocatableImpl(
     const MCSpecifierExpr &Expr, MCValue &Res, const MCAssembler *Asm) const {
+  return evaluateAsRelocatable(Expr, Res, Asm);
+}
+
+// Darwin
+
+void PPCMCAsmInfoDarwin::anchor() { }
+
+PPCMCAsmInfoDarwin::PPCMCAsmInfoDarwin(bool is64Bit, const Triple& T) {
+  if (is64Bit) {
+    CodePointerSize = CalleeSaveStackSlotSize = 8;
+  }
+  IsLittleEndian = false;
+
+  // ".comm align is in bytes but .align is pow-2."
+  AlignmentIsInBytes = false;
+
+  CommentString = ";";
+  ExceptionsType = ExceptionHandling::DwarfCFI;
+  
+  SupportsDebugInformation = true; // Debug information.
+
+  // The installed assembler for OSX < 10.6 lacks some directives.
+  // FIXME: this should really be a check on the assembler characteristics
+  // rather than OS version
+  if (T.isMacOSX() && T.isMacOSXVersionLT(10, 6))
+    HasWeakDefCanBeHiddenDirective = false;
+
+  ZeroDirective = "\t.space\t";
+  Data64bitsDirective = is64Bit ? "\t.quad\t" : nullptr;
+  AssemblerDialect = 1; // New-Style mnemonics.
+  LCOMMDirectiveAlignmentType = LCOMM::ByteAlignment;
+  UseIntegratedAssembler = true;
+
+  initializeAtSpecifiers(darwinAtSpecifiers);
+}
+
+void PPCMCAsmInfoDarwin::printSpecifierExpr(raw_ostream &OS,
+                                            const MCSpecifierExpr &Expr) const {
+  printExpr(OS, *Expr.getSubExpr());
+  OS << '@' << getSpecifierName(Expr.getSpecifier());
+}
+
+bool PPCMCAsmInfoDarwin::evaluateAsRelocatableImpl(const MCSpecifierExpr &Expr,
+                                                   MCValue &Res,
+                                                   const MCAssembler *Asm) const {
   return evaluateAsRelocatable(Expr, Res, Asm);
 }

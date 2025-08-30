@@ -13,6 +13,7 @@
 #ifndef LLVM_LIB_TARGET_POWERPC_MCTARGETDESC_PPCMCASMINFO_H
 #define LLVM_LIB_TARGET_POWERPC_MCTARGETDESC_PPCMCASMINFO_H
 
+#include "llvm/MC/MCAsmInfoDarwin.h"
 #include "llvm/MC/MCAsmInfoELF.h"
 #include "llvm/MC/MCAsmInfoXCOFF.h"
 #include "llvm/MC/MCExpr.h"
@@ -20,6 +21,17 @@
 
 namespace llvm {
 class Triple;
+
+class PPCMCAsmInfoDarwin : public MCAsmInfoDarwin {
+  virtual void anchor();
+
+public:
+  explicit PPCMCAsmInfoDarwin(bool is64Bit, const Triple &);
+  void printSpecifierExpr(raw_ostream &OS,
+                          const MCSpecifierExpr &Expr) const override;
+  bool evaluateAsRelocatableImpl(const MCSpecifierExpr &Expr, MCValue &Res,
+                                 const MCAssembler *Asm) const override;
+};
 
 class PPCELFMCAsmInfo : public MCAsmInfoELF {
   void anchor() override;
