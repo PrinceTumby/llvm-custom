@@ -6,8 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-// This code is largely based on source code from LLVM 10.0.1, updated to work
-// with current LLVM source.
+// This code is based on source code from LLVM 10.0.1, updated to work with
+// current LLVM source, as well as the AArch64 implementation.
 
 #include "MCTargetDesc/PPCFixupKinds.h"
 #include "MCTargetDesc/PPCMCAsmInfo.h"
@@ -34,7 +34,7 @@ class PPCMachObjectWriter : public MCMachObjectTargetWriter {
                                  const MCFixup &Fixup, MCValue Target,
                                  unsigned Log2Size, uint64_t &FixedValue);
 
-  void RecordPPCRelocation(MachObjectWriter *Writer,
+  void recordPPCRelocation(MachObjectWriter *Writer,
                               const MCAssembler &Asm,
                               const MCFragment *Fragment,
                               const MCFixup &Fixup,
@@ -50,7 +50,7 @@ public:
     if (Writer->is64Bit())
       report_fatal_error("Relocation emission for MachO/PPC64 unimplemented.");
     else
-      RecordPPCRelocation(Writer, Asm, Fragment, Fixup, Target, FixedValue);
+      recordPPCRelocation(Writer, Asm, Fragment, Fixup, Target, FixedValue);
   }
 };
 } // namespace
@@ -114,6 +114,8 @@ static unsigned getRelocType(const MCFixup &Fixup,
             "\" for half16 fixup"
         );
       case PPC::S_None:
+        Type = MachO::PPC_RELOC_VANILLA;
+        break;
       case PPC::S_LO:
         Type = MachO::PPC_RELOC_LO16;
         break;
@@ -228,15 +230,13 @@ bool PPCMachObjectWriter::recordScatteredRelocation(
 
   // See <reloc.h>.
   const MCSymbol *A = Target.getAddSym();
+  if (A->isTemporary())
+    A = &Writer->findAliasedSymbol(*A);
 
-  if (!A->getFragment() && Target.getSubSym())
-    report_fatal_error(
-      "scattered A symbol can not be undefined in a subtraction expression"
-    );
-
-  // // If we don't have any symbols, then this is an immediate value, and so
-  // // doesn't need relocation.
-  // if (!A->getFragment()) return false;
+  if (A->isUndefined())
+    report_fatal_error("scattered A symbol '" + A->getName() +
+                       "' cannot be undefined in a subtraction expression");
+  if (!A->getFragment()) return false;
 
   uint32_t Value = Writer->getSymbolAddress(*A);
   FixedValue += Writer->getSectionAddress(A->getFragment()->getParent());
@@ -245,22 +245,22 @@ bool PPCMachObjectWriter::recordScatteredRelocation(
   if (const MCSymbol *SB = Target.getSubSym()) {
     if (!SB->getFragment())
       report_fatal_error("scattered B symbol '" + SB->getName() +
-                         "' can not be undefined in a subtraction expression");
+                         "' cannot be undefined in a subtraction expression");
 
     // FIXME: is Type correct? see include/llvm/BinaryFormat/MachO.h
-    Type = MachO::PPC_RELOC_SECTDIFF;
+    Type = A->isExternal() ? MachO::PPC_RELOC_SECTDIFF
+                           : MachO::PPC_RELOC_LOCAL_SECTDIFF;
     Value2 = Writer->getSymbolAddress(*SB);
     FixedValue -= Writer->getSectionAddress(SB->getFragment()->getParent());
   }
-  // FIXME: does FixedValue get used??
 
   // Relocations are written out in reverse order, so the PAIR comes first.
   if (Type == MachO::PPC_RELOC_SECTDIFF ||
+      Type == MachO::PPC_RELOC_LOCAL_SECTDIFF ||
       Type == MachO::PPC_RELOC_HI16_SECTDIFF ||
       Type == MachO::PPC_RELOC_LO16_SECTDIFF ||
       Type == MachO::PPC_RELOC_HA16_SECTDIFF ||
-      Type == MachO::PPC_RELOC_LO14_SECTDIFF ||
-      Type == MachO::PPC_RELOC_LOCAL_SECTDIFF) {
+      Type == MachO::PPC_RELOC_LO14_SECTDIFF) {
     // X86 had this piece, but ARM does not
     // If the offset is too large to fit in a scattered relocation,
     // we're hosed. It's an unfortunate limitation of the MachO format.
@@ -277,10 +277,13 @@ bool PPCMachObjectWriter::recordScatteredRelocation(
 
     // Is this supposed to follow MCTarget/PPCAsmBackend.cpp:adjustFixupValue()?
     // see PPCMCExpr::evaluateAsRelocatableImpl()
-    uint32_t other_half = 0;
+    uint32_t OtherHalf = 0;
     switch (Type) {
+    default:
+      report_fatal_error("Invalid PPC scattered relocation type.");
+      break;
     case MachO::PPC_RELOC_LO16_SECTDIFF:
-      other_half = (FixedValue >> 16) & 0xffff;
+      OtherHalf = (FixedValue >> 16) & 0xffff;
       // applyFixupOffset no longer extracts the high part because it now
       // assumes this was already done.
       // It looks like this is not true for the FixedValue needed with Mach-O
@@ -289,21 +292,18 @@ bool PPCMachObjectWriter::recordScatteredRelocation(
       FixedValue &= 0xffff;
       break;
     case MachO::PPC_RELOC_HA16_SECTDIFF:
-      other_half = FixedValue & 0xffff;
+      OtherHalf = FixedValue & 0xffff;
       FixedValue =
           ((FixedValue >> 16) + ((FixedValue & 0x8000) ? 1 : 0)) & 0xffff;
       break;
     case MachO::PPC_RELOC_HI16_SECTDIFF:
-      other_half = FixedValue & 0xffff;
+      OtherHalf = FixedValue & 0xffff;
       FixedValue = (FixedValue >> 16) & 0xffff;
-      break;
-    default:
-      llvm_unreachable("Invalid PPC scattered relocation type.");
       break;
     }
 
     MachO::any_relocation_info MRE;
-    makeScatteredRelocationInfo(MRE, other_half, MachO::GENERIC_RELOC_PAIR,
+    makeScatteredRelocationInfo(MRE, OtherHalf, MachO::PPC_RELOC_PAIR,
                                 Log2Size, IsPCRel, Value2);
     Writer->addRelocation(nullptr, Fragment->getParent(), MRE);
   } else {
@@ -324,50 +324,60 @@ bool PPCMachObjectWriter::recordScatteredRelocation(
 }
 
 // see PPCELFObjectWriter for a general outline of cases
-void PPCMachObjectWriter::RecordPPCRelocation(
+void PPCMachObjectWriter::recordPPCRelocation(
     MachObjectWriter *Writer, const MCAssembler &Asm,
     const MCFragment *Fragment, const MCFixup &Fixup, MCValue Target,
     uint64_t &FixedValue) {
   const unsigned Log2Size = getFixupKindLog2Size(Fixup);
   const bool IsPCRel = Fixup.isPCRel();
   const unsigned RelocType = getRelocType(Fixup, Target, IsPCRel);
+  const MCSymbol *A = Target.getAddSym();
 
   // If this is a difference or a defined symbol plus an offset, then we need a
   // scattered relocation entry. Differences always require scattered
   // relocations.
-  if (Target.getSubSym() &&
-      // Q: are branch targets ever scattered?
-      RelocType != MachO::PPC_RELOC_BR24 &&
-      RelocType != MachO::PPC_RELOC_BR14) {
-    recordScatteredRelocation(Writer, Asm, Fragment, Fixup, Target,
-                                  Log2Size, FixedValue);
+  if (Target.getSubSym()) {
+    if (!recordScatteredRelocation(Writer, Asm, Fragment, Fixup, Target,
+                                   Log2Size, FixedValue)) {
+      report_fatal_error("Scattered relocation failed");
+    }
     return;
   }
+  const uint32_t Offset = Target.getConstant();
 
-  // this doesn't seem right for RIT_PPC_BR24
-  // Get the symbol data, if any.
-  const MCSymbol *A = Target.getAddSym();
+  if (Offset && A && !Writer->doesSymbolRequireExternRelocation(*A) &&
+      recordScatteredRelocation(Writer, Asm, Fragment, Fixup, Target,
+                                Log2Size, FixedValue))
+    return;
 
-  // See <reloc.h>.
   const uint32_t FixupOffset = getFixupOffset(Asm, Fragment, Fixup);
   unsigned Index = 0;
   unsigned Type = RelocType;
-
   const MCSymbol *RelSymbol = nullptr;
+
   if (Target.isAbsolute()) { // constant
-                             // SymbolNum of 0 indicates the absolute section.
-                             //
+    // SymbolNum of 0 indicates the absolute section.
+    //
     // FIXME: Currently, these are never generated (see code below). I cannot
     // find a case where they are actually emitted.
     report_fatal_error("FIXME: relocations to absolute targets "
                        "not yet implemented");
-    // the above line stolen from ARM, not sure
   } else {
+    assert(A && "Unknown symbol data");
+
     // Resolve constant variables.
     if (A->isVariable()) {
-      int64_t Res;
-      if (A->getVariableValue()->evaluateAsAbsolute(
-              Res, Asm)) {
+      MCValue Val;
+      bool Relocatable =
+          A->getVariableValue()->evaluateAsRelocatable(Val, &Asm);
+      int64_t Res = Val.getConstant();
+      bool isAbs = Val.isAbsolute();
+      if (Relocatable && Val.getAddSym() && Val.getSubSym()) {
+        Res += Writer->getSymbolAddress(*Val.getAddSym()) -
+               Writer->getSymbolAddress(*Val.getSubSym());
+        isAbs = true;
+      }
+      if (isAbs) {
         FixedValue = Res;
         return;
       }
