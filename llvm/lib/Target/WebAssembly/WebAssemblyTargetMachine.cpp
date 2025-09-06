@@ -88,6 +88,8 @@ LLVMInitializeWebAssemblyTarget() {
   RegisterTargetMachine<WebAssemblyTargetMachine> X(
       getTheWebAssemblyTarget32());
   RegisterTargetMachine<WebAssemblyTargetMachine> Y(
+      getTheWebAssemblyTarget32BE());
+  RegisterTargetMachine<WebAssemblyTargetMachine> Z(
       getTheWebAssemblyTarget64());
 
   // Register backend passes
@@ -205,8 +207,11 @@ WebAssemblyTargetMachine::WebAssemblyTargetMachine(
                                        "i128:128-n32:64-S128-ni:1:10:20")
               : (TT.isOSEmscripten() ? "e-m:e-p:32:32-p10:8:8-p20:8:8-i64:64-"
                                        "i128:128-f128:64-n32:64-S128-ni:1:10:20"
-                                     : "e-m:e-p:32:32-p10:8:8-p20:8:8-i64:64-"
-                                       "i128:128-n32:64-S128-ni:1:10:20"),
+                                     : (TT.isLittleEndian()
+                                          ? "e-m:e-p:32:32-p10:8:8-p20:8:8-i64:64-"
+                                            "i128:128-n32:64-S128-ni:1:10:20"
+                                          : "E-m:e-p:32:32-p10:8:8-p20:8:8-i64:64-"
+                                            "i128:128-n32:64-S128-ni:1:10:20")),
           TT, CPU, FS, Options, getEffectiveRelocModel(RM, TT),
           getEffectiveCodeModel(CM, CodeModel::Large), OL),
       TLOF(new WebAssemblyTargetObjectFile()),

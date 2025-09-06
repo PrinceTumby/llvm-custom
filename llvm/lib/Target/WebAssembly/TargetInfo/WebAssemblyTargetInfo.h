@@ -19,6 +19,7 @@ namespace llvm {
 class Target;
 
 Target &getTheWebAssemblyTarget32();
+Target &getTheWebAssemblyTarget32BE();
 Target &getTheWebAssemblyTarget64();
 
 namespace WebAssembly {

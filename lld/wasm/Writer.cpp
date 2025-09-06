@@ -1881,7 +1881,9 @@ void Writer::openFile() {
 void Writer::createHeader() {
   raw_string_ostream os(header);
   writeBytes(os, WasmMagic, sizeof(WasmMagic), "wasm magic");
-  writeU32(os, WasmVersion, "wasm version");
+  const uint32_t version =
+    ctx.arg.isBE.value_or(false) ? WasmVersion : WasmBigEndianVersion;
+  writeU32(os, version, "wasm version");
   fileSize += header.size();
 }
 

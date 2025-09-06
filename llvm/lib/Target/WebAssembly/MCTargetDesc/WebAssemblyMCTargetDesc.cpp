@@ -98,8 +98,8 @@ static MCTargetStreamer *createNullTargetStreamer(MCStreamer &S) {
 // Force static initialization.
 extern "C" LLVM_ABI LLVM_EXTERNAL_VISIBILITY void
 LLVMInitializeWebAssemblyTargetMC() {
-  for (Target *T :
-       {&getTheWebAssemblyTarget32(), &getTheWebAssemblyTarget64()}) {
+  for (Target *T : {&getTheWebAssemblyTarget32(), &getTheWebAssemblyTarget32BE(),
+                    &getTheWebAssemblyTarget64()}) {
     // Register the MC asm info.
     RegisterMCAsmInfoFn X(*T, createMCAsmInfo);
 

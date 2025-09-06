@@ -27,6 +27,8 @@ namespace wasm {
 const char WasmMagic[] = {'\0', 'a', 's', 'm'};
 // Wasm binary format version
 const uint32_t WasmVersion = 0x1;
+// Wasm binary format version for the big endian variant (experimental)
+const uint32_t WasmBigEndianVersion = 0xFFFFFFFF;
 // Wasm linking metadata version
 const uint32_t WasmMetadataVersion = 0x2;
 // Wasm uses a 64k page size by default (but the custom-page-sizes proposal

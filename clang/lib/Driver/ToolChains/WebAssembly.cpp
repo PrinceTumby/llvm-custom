@@ -90,10 +90,12 @@ void wasm::Linker::ConstructJob(Compilation &C, const JobAction &JA,
   ArgStringList CmdArgs;
 
   CmdArgs.push_back("-m");
-  if (ToolChain.getTriple().isArch64Bit())
+  if (ToolChain.getTriple().isArch64Bit()) {
     CmdArgs.push_back("wasm64");
-  else
+  else if (ToolChain.getTriple().isLittleEndian())
     CmdArgs.push_back("wasm32");
+  else
+    CmdArgs.push_back("wasm32be");
 
   if (Args.hasArg(options::OPT_s))
     CmdArgs.push_back("--strip-all");

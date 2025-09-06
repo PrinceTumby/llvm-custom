@@ -115,6 +115,7 @@ static Value *EmitTargetArchBuiltinExpr(CodeGenFunction *CGF,
   case llvm::Triple::nvptx64:
     return CGF->EmitNVPTXBuiltinExpr(BuiltinID, E);
   case llvm::Triple::wasm32:
+  case llvm::Triple::wasm32be:
   case llvm::Triple::wasm64:
     return CGF->EmitWebAssemblyBuiltinExpr(BuiltinID, E);
   case llvm::Triple::hexagon:

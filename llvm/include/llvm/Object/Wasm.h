@@ -299,6 +299,7 @@ private:
   bool HasDylinkSection = false;
   bool HasMemory64 = false;
   bool HasUnmodeledTypes = false;
+  bool IsBigEndian = false;
   wasm::WasmLinkingData LinkingData;
   uint32_t NumImportedGlobals = 0;
   uint32_t NumImportedTables = 0;

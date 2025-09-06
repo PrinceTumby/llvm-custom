@@ -481,7 +481,7 @@ def TargetX86 : TargetArch<["x86"]>;
 def TargetX86_64 : TargetArch<["x86_64"]>;
 def TargetAnyX86 : TargetArch<["x86", "x86_64"]>;
 def TargetSPIRV : TargetArch<["spirv", "spirv32", "spirv64"]>;
-def TargetWebAssembly : TargetArch<["wasm32", "wasm64"]>;
+def TargetWebAssembly : TargetArch<["wasm32", "wasm32be", "wasm64"]>;
 def TargetNVPTX : TargetArch<["nvptx", "nvptx64"]>;
 def TargetWindows : TargetSpec {
   let OSes = ["Win32"];

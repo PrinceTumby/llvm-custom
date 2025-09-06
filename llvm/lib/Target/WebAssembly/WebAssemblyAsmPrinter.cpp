@@ -764,5 +764,6 @@ INITIALIZE_PASS(WebAssemblyAsmPrinter, "webassembly-asm-printer",
 extern "C" LLVM_ABI LLVM_EXTERNAL_VISIBILITY void
 LLVMInitializeWebAssemblyAsmPrinter() {
   RegisterAsmPrinter<WebAssemblyAsmPrinter> X(getTheWebAssemblyTarget32());
-  RegisterAsmPrinter<WebAssemblyAsmPrinter> Y(getTheWebAssemblyTarget64());
+  RegisterAsmPrinter<WebAssemblyAsmPrinter> Y(getTheWebAssemblyTarget32BE());
+  RegisterAsmPrinter<WebAssemblyAsmPrinter> Z(getTheWebAssemblyTarget64());
 }

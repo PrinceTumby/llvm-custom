@@ -1614,6 +1614,7 @@ void Clang::RenderTargetOptions(const llvm::Triple &EffectiveTriple,
     break;
 
   case llvm::Triple::wasm32:
+  case llvm::Triple::wasm32be:
   case llvm::Triple::wasm64:
     AddWebAssemblyTargetArgs(Args, CmdArgs);
     break;
@@ -2519,6 +2520,7 @@ static void CollectArgsForIntegratedAssembler(Compilation &C,
         }
         break;
       case llvm::Triple::wasm32:
+      case llvm::Triple::wasm32be:
       case llvm::Triple::wasm64:
         if (Value == "--no-type-check") {
           CmdArgs.push_back("-mno-type-check");

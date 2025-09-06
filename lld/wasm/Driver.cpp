@@ -657,15 +657,21 @@ static void readConfigs(opt::InputArgList &args) {
   ctx.arg.exportDynamic =
       args.hasFlag(OPT_export_dynamic, OPT_no_export_dynamic, ctx.arg.shared);
 
-  // Parse wasm32/64.
+  // Parse wasm(32/64)(be)?.
   if (auto *arg = args.getLastArg(OPT_m)) {
     StringRef s = arg->getValue();
-    if (s == "wasm32")
+    if (s == "wasm32") {
       ctx.arg.is64 = false;
-    else if (s == "wasm64")
+      ctx.arg.isBE = false;
+    } else if (s == "wasm32be") {
+      ctx.arg.is64 = false;
+      ctx.arg.isBE = true;
+    } else if (s == "wasm64") {
       ctx.arg.is64 = true;
-    else
+      ctx.arg.isBE = false;
+    } else {
       error("invalid target architecture: " + s);
+    }
   }
 
   // --threads= takes a positive integer and provides the default value for

@@ -2098,6 +2098,7 @@ bool Sema::CheckTSBuiltinFunctionCall(const TargetInfo &TI, unsigned BuiltinID,
     return LoongArch().CheckLoongArchBuiltinFunctionCall(TI, BuiltinID,
                                                          TheCall);
   case llvm::Triple::wasm32:
+  case llvm::Triple::wasm32be:
   case llvm::Triple::wasm64:
     return Wasm().CheckWebAssemblyBuiltinFunctionCall(TI, BuiltinID, TheCall);
   case llvm::Triple::nvptx:

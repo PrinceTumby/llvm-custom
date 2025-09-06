@@ -154,6 +154,7 @@ createTargetCodeGenInfo(CodeGenModule &CGM) {
   }
 
   case llvm::Triple::wasm32:
+  case llvm::Triple::wasm32be:
   case llvm::Triple::wasm64: {
     WebAssemblyABIKind Kind = WebAssemblyABIKind::MVP;
     if (Target.getABI() == "experimental-mv")

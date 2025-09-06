@@ -15,6 +15,7 @@
 #include "llvm/BinaryFormat/WasmTraits.h"
 #include "llvm/Config/llvm-config.h"
 #include "llvm/MC/MCAsmBackend.h"
+#include "llvm/MC/MCAsmInfo.h"
 #include "llvm/MC/MCAssembler.h"
 #include "llvm/MC/MCContext.h"
 #include "llvm/MC/MCExpr.h"
@@ -444,7 +445,10 @@ void WasmObjectWriter::endSection(SectionBookkeeping &Section) {
 // Emit the Wasm header.
 void WasmObjectWriter::writeHeader(const MCAssembler &Asm) {
   W->OS.write(wasm::WasmMagic, sizeof(wasm::WasmMagic));
-  W->write<uint32_t>(wasm::WasmVersion);
+  const uint32_t Version = Asm.getContext().getAsmInfo()->isLittleEndian()
+    ? wasm::WasmVersion
+    : wasm::WasmBigEndianVersion;
+  W->write<uint32_t>(Version);
 }
 
 void WasmObjectWriter::executePostLayoutBinding() {

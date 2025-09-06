@@ -78,6 +78,7 @@ static bool useFramePointerForTargetByDefault(const llvm::opt::ArgList &Args,
   switch (Triple.getArch()) {
   case llvm::Triple::xcore:
   case llvm::Triple::wasm32:
+  case llvm::Triple::wasm32be:
   case llvm::Triple::wasm64:
   case llvm::Triple::msp430:
     // XCore never wants frame pointers, regardless of OS.
@@ -790,6 +791,7 @@ std::string tools::getCPUName(const Driver &D, const ArgList &Args,
     return getAMDGPUTargetGPU(T, Args);
 
   case llvm::Triple::wasm32:
+  case llvm::Triple::wasm32be:
   case llvm::Triple::wasm64:
     return std::string(getWebAssemblyTargetCPU(Args));
 
@@ -857,6 +859,7 @@ void tools::getTargetFeatures(const Driver &D, const llvm::Triple &Triple,
     hexagon::getHexagonTargetFeatures(D, Triple, Args, Features);
     break;
   case llvm::Triple::wasm32:
+  case llvm::Triple::wasm32be:
   case llvm::Triple::wasm64:
     getWebAssemblyTargetFeatures(D, Triple, Args, Features);
     break;

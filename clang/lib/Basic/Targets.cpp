@@ -715,6 +715,21 @@ std::unique_ptr<TargetInfo> AllocateTarget(const llvm::Triple &Triple,
       default:
         return nullptr;
     }
+  case llvm::Triple::wasm32be:
+    if (Triple.getSubArch() != llvm::Triple::NoSubArch ||
+        Triple.getVendor() != llvm::Triple::UnknownVendor ||
+        !Triple.isOSBinFormatWasm())
+      return nullptr;
+    switch (os) {
+      case llvm::Triple::WASI:
+      return std::make_unique<WASITargetInfo<WebAssembly32TargetInfo>>(Triple,
+                                                                       Opts);
+      case llvm::Triple::UnknownOS:
+      return std::make_unique<WebAssemblyOSTargetInfo<WebAssembly32TargetInfo>>(
+          Triple, Opts);
+      default:
+        return nullptr;
+    }
   case llvm::Triple::wasm64:
     if (Triple.getSubArch() != llvm::Triple::NoSubArch ||
         Triple.getVendor() != llvm::Triple::UnknownVendor ||

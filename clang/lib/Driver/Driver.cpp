@@ -6949,6 +6949,7 @@ const ToolChain &Driver::getToolChain(const ArgList &Args,
         TC = std::make_unique<toolchains::XCoreToolChain>(*this, Target, Args);
         break;
       case llvm::Triple::wasm32:
+      case llvm::Triple::wasm32be:
       case llvm::Triple::wasm64:
         TC = std::make_unique<toolchains::WebAssembly>(*this, Target, Args);
         break;

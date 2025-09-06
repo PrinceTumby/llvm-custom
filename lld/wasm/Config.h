@@ -70,6 +70,7 @@ struct Config {
   bool importTable;
   bool importUndefined;
   std::optional<bool> is64;
+  std::optional<bool> isBE;
   bool mergeDataSegments;
   bool noinhibitExec;
   bool pie;

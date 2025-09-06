@@ -72,6 +72,8 @@ LLVMInitializeWebAssemblyDisassembler() {
   // Register the disassembler for each target.
   TargetRegistry::RegisterMCDisassembler(getTheWebAssemblyTarget32(),
                                          createWebAssemblyDisassembler);
+  TargetRegistry::RegisterMCDisassembler(getTheWebAssemblyTarget32BE(),
+                                         createWebAssemblyDisassembler);
   TargetRegistry::RegisterMCDisassembler(getTheWebAssemblyTarget64(),
                                          createWebAssemblyDisassembler);
 }

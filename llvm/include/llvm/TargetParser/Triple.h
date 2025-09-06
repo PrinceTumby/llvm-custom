@@ -104,6 +104,7 @@ public:
     shave,          // SHAVE: Movidius vector VLIW processors
     lanai,          // Lanai: Lanai 32-bit
     wasm32,         // WebAssembly with 32-bit pointers
+    wasm32be,       // WebAssembly with 32-bit pointers (big endian)
     wasm64,         // WebAssembly with 64-bit pointers
     renderscript32, // 32-bit RenderScript
     renderscript64, // 64-bit RenderScript
@@ -1104,9 +1105,12 @@ public:
     return getArch() == Triple::ve;
   }
 
-  /// Tests whether the target is wasm (32- and 64-bit).
+  /// Tests whether the target is wasm (32- and 64-bit, little and big
+  /// endian).
   bool isWasm() const {
-    return getArch() == Triple::wasm32 || getArch() == Triple::wasm64;
+    return getArch() == Triple::wasm32
+      || getArch() == Triple::wasm32be
+      || getArch() == Triple::wasm64;
   }
 
   // Tests whether the target is CSKY

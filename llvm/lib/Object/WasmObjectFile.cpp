@@ -370,7 +370,11 @@ WasmObjectFile::WasmObjectFile(MemoryBufferRef Buffer, Error &Err)
   }
 
   Header.Version = readUint32(Ctx);
-  if (Header.Version != wasm::WasmVersion) {
+  if (Header.Version == wasm::WasmVersion) {
+    IsBigEndian = false;
+  } else if (Header.Version == wasm::WasmBigEndianVersion) {
+    IsBigEndian = true;
+  } else {
     Err = make_error<StringError>("invalid version number: " +
                                       Twine(Header.Version),
                                   object_error::parse_failed);
@@ -2113,7 +2117,9 @@ uint8_t WasmObjectFile::getBytesInAddress() const {
 StringRef WasmObjectFile::getFileFormatName() const { return "WASM"; }
 
 Triple::ArchType WasmObjectFile::getArch() const {
-  return HasMemory64 ? Triple::wasm64 : Triple::wasm32;
+  return HasMemory64 ? Triple::wasm64
+                     : (IsBigEndian ? Triple::wasm32be
+                                    : Triple::wasm32);
 }
 
 Expected<SubtargetFeatures> WasmObjectFile::getFeatures() const {
