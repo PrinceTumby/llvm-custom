@@ -66,6 +66,12 @@ INITIALIZE_PASS(MipsShortLoopBugFix, "mips-r5900-short-loop-fix",
 
 char MipsShortLoopBugFix::ID = 0;
 
+// Q: What should this be? Currently set to 10 as a safe margin.
+// Think the bug triggers with loops of fewer than seven instructions,
+// including the delay slot, but I'm not sure if the counted BB instructions
+// include the delay slot instruction.
+static constexpr unsigned int SHORT_LOOP_THRESHOLD = 10;
+
 bool MipsShortLoopBugFix::runOnMachineFunction(MachineFunction &MF) {
   LLVM_DEBUG(dbgs() << "Start MipsR5900ShortLoopBugPass\n";);
   const MipsInstrInfo &II =
@@ -81,11 +87,12 @@ bool MipsShortLoopBugFix::runOnMachineFunction(MachineFunction &MF) {
 
 bool MipsShortLoopBugFix::fixShortLoopBB(MachineBasicBlock &MBB,
                                          const MipsInstrInfo &II) {
-  // Pad all basic blocks which loop back within seven instructions.
+  // Pad all basic blocks which loop back within the set number of
+  // instructions.
   if (auto CycleInstructions = loopsBacktoMBB(&MBB, &MBB, 0)) {
-    assert(*CycleInstructions < 8 &&
-        "Cycle contains fewer than 8 instructions");
-    padBeginning(MBB, II, 8 - *CycleInstructions);
+    assert(*CycleInstructions < SHORT_LOOP_THRESHOLD &&
+        "Cycle contains fewer instructions than the threshold");
+    padBeginning(MBB, II, SHORT_LOOP_THRESHOLD - *CycleInstructions);
     return true;
   } else {
     return false;
@@ -103,7 +110,7 @@ std::optional<unsigned int> MipsShortLoopBugFix::loopsBacktoMBB(
     std::distance(NoDebugInstrs.begin(), NoDebugInstrs.end());
   unsigned int NewInstructionCount =
     CurrentInstructionCount + MBBNumInstructions;
-  if (NewInstructionCount > 7) return {};
+  if (NewInstructionCount >= SHORT_LOOP_THRESHOLD) return {};
   for (MachineBasicBlock *SuccMBB : CurrentMBB->successors()) {
     if (SuccMBB == OriginalMBB) return NewInstructionCount;
     if (auto InstrCount = loopsBacktoMBB(SuccMBB, OriginalMBB, NewInstructionCount)) {
@@ -117,13 +124,8 @@ void MipsShortLoopBugFix::padBeginning(MachineBasicBlock &MBB,
                                        const MipsInstrInfo &II,
                                        unsigned int NOPsToAdd) {
   if (MBB.empty()) {
+    // Q: Can this ever happen?
     assert(false && "Basic block should not be empty");
-    // const DebugLoc DL = MBB.findDebugLoc(MBB.instr_begin());
-    // for (unsigned int i = 0, e = NOPsToAdd; i < e; i++) {
-    //   auto I = MBB.instr_front();
-    //   const DebugLoc &DL = I.getDebugLoc();
-    //   BuildMI(MBB, I, DL, II.get(Mips::NOP));
-    // }
   } else {
     for (unsigned int i = 0, e = NOPsToAdd; i < e; i++) {
       MachineInstr &I = MBB.instr_front();
